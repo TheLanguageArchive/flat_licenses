@@ -1,0 +1,49 @@
+<?php
+
+function flat_licenses_schema()
+{
+
+    $schema = [
+
+        'flat_licenses' => [
+
+            'description' => 'Table that stores licenses to be used for a given node and its children',
+            'fields'      => [
+
+                'id' => [
+
+                    'description' => 'The primary identifier',
+                    'type'        => 'serial',
+                    'not null'    => true,
+                ],
+
+                'label' => [
+
+                    'description' => 'License label to be displayed',
+                    'type'        => 'varchar',
+                    'length'      => 255,
+                    'not null'    => true,
+                ],
+
+                'url' => [
+
+                    'description' => 'URL of the license',
+                    'type'        => 'varchar',
+                    'length'      => 255,
+                    'not null'    => true,
+                ],
+
+                'pid' => [
+
+                    'description' => 'Fedora ID for the collection to which the license should be applied',
+                    'type'        => 'varchar',
+                    'length'      => 255,
+                    'not null'    => true,
+                ],
+            ],
+            'primary key' => ['id'],
+        ],
+    ];
+
+    return $schema;
+}

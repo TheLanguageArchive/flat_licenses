@@ -1,0 +1,427 @@
+<?php
+/**
+ * @file
+ * Flat License
+ */
+
+// Includes functions for common db queries.
+require_once dirname(__FILE__) . '/includes/db.inc';
+
+/**
+ * Implements hook_block_info().
+ */
+function flat_licenses_block_info()
+{
+    return array(
+      'flat_license' => array(
+        'visibility' => BLOCK_VISIBILITY_LISTED,
+        'pages' => 'islandora/object/*',
+        'cache' => DRUPAL_CACHE_PER_PAGE,
+        'info' => t('FLAT Licenses'),
+      ),
+    );
+}
+  
+function flat_licenses_get_licenses(AbstractObject $object)
+{
+
+    module_load_include('inc', 'flat_licenses', 'includes/licenseExtractor');
+
+    $extractor       = new licenseExtractor();
+    $licenses = $extractor->lookup($object->id);
+
+    return $licenses;
+}
+  
+  
+/**
+ * Implements hook_block_view().
+ */
+function flat_licenses_block_view()
+{
+
+    $to_render = array();
+
+    $object = menu_get_object('islandora_object', 2);
+
+    if ($object) {
+        $licenses = flat_licenses_get_licenses($object);
+
+        $result = "<p>" . $licenses . "</p>";
+
+        if (isset($result)) {
+            $to_render['content'] = $result;
+        }
+    }
+    return $to_render;
+}
+
+/**
+ * Create admin page for assigning licenses
+ *
+ * @return array
+ */
+function flat_licenses_menu()
+{
+
+    $items = [
+
+        'admin/config/flat_deposit/flat_licenses' => [
+
+            'title'            => 'Configure default licenses',
+            'description'      => 'Assign default licenses to certain nodes in the repository',
+            'page callback'    => 'drupal_get_form',
+            'page arguments'   => ['flat_licenses_admin'],
+            'access callback'  => 'flat_licenses_admin_access',
+            'access arguments' => ['manage licenses menu', 2],
+            'type'             => MENU_NORMAL_ITEM,
+        ],
+    ];
+
+    return $items;
+}
+
+/**
+ * @param string         $op
+ * @param AbstractObject $object
+ *
+ * @return boolean
+ */
+function flat_licenses_admin_access($op, $object)
+{
+    return user_access('manage licenses menu');
+}
+
+/**
+ * @return array
+ */
+function flat_licenses_permission()
+{
+
+    return [
+        'manage licenses menu' => [
+            'title' => t('Configure default licenses'),
+            'description' => t('Assign default licenses to certain nodes in the repository'),
+        ],
+    ];
+}
+
+/**
+ * Connect admin table theme to page
+ *
+ * @return array
+ */
+function flat_licenses_theme()
+{
+
+    return [
+
+        'flat_licenses_admin_table' => [
+
+            'path'           => drupal_get_path('module', 'flat_licenses'),
+            'file'           => 'includes/admin.inc',
+            'render element' => 'form',
+        ],
+    ];
+}
+
+/**
+ * Licenses admin form
+ *
+ * @param array $form
+ * @param array $form_state
+ *
+ * @return array
+ */
+function flat_licenses_admin($form, &$form_state)
+{
+
+    $module_path = drupal_get_path('module', 'flat_licenses');
+
+    $form['#attached'] = [
+      'css' => [
+          $module_path . '/css/flat-licenses.admin.css',
+      ],
+    ];
+
+    $form['#validate'][] = 'flat_licenses_validate';
+
+    $form['general'] = [
+
+        '#type'   => 'vertical_tabs',
+        '#weight' => 5,
+    ];
+
+    $form['general']['licenses'] = [
+
+        '#type'        => 'fieldset',
+        '#title'       => t('Licenses'),
+        '#collapsible' => true,
+    ];
+
+    if ($form_state['rebuild'] == false) {
+        $licenses = flat_licenses_db_get_values();
+        $form_state['licenses'] = [];
+
+        foreach ($licenses as $id => $license) {
+            // move licenses into form_state
+            $form_state['licenses'][$id] = $license;
+        }
+    }
+
+    if (isset($form_state['triggering_element'])) {
+        if ($form_state['triggering_element']['#value'] == t('Remove')) {
+            $id = $form_state['triggering_element']['#id'];
+            unset($form_state['licenses'][$id]);
+        }
+
+        if ($form_state['triggering_element']['#value'] == t('Add')) {
+            $label  = $form_state['values']['table']['add_license']['label'];
+            $url = $form_state['values']['table']['add_license']['url'];
+            $pid = $form_state['values']['table']['add_license']['pid'];
+
+            if (empty($label) || empty($url) || empty($pid)) {
+                $error = t('One of the fields wasn\'t properly filled in');
+            }
+
+            if (!isset($error)) {
+                // add new license
+                $form_state['licenses'][] = ['label' => $label, 'url' => $url, 'pid' => $pid];
+
+                // clear input fields
+                $form_state['input']['table']['add_license']['label']  = '';
+                $form_state['input']['table']['add_license']['url'] = '';
+                $form_state['input']['table']['add_license']['pid'] = '';
+            }
+        }
+    }
+
+    $form['general']['licenses']['table'] = [
+
+        '#type'        => 'item',
+        '#title'       => t('Default licenses'),
+        '#description' => t('Assign licenses to nodes in the repository, to be displayed in case no license 
+        is specified in the metadata. Add multiple rows for adding the same license to different nodes.'),
+        '#tree'        => true,
+        '#theme'       => 'flat_licenses_admin_table',
+        '#prefix'      => '<div id="flat-licenses-admin-wrapper">',
+        '#suffix'      => '</div>',
+    ];
+
+    $licenses = [];
+
+    foreach ($form_state['licenses'] as $id => $license) {
+        $licenses[$id] = [
+
+            'id' => [
+                '#type' => 'hidden',
+                '#value' => $id,
+            ],
+            'label' => [
+                '#type' => 'textfield',
+                '#value' => $license['label'],
+            ],
+            'url' => [
+              '#type' => 'textfield',
+              '#value' => $license['url'],
+            ],
+            'pid' => [
+              '#type' => 'textfield',
+              '#value' => $license['pid'],
+            ],
+            'operations' => [
+
+                '#type'       => 'button',
+                '#value'      => t('Remove'),
+                '#id'         => $id,
+                '#attributes' => ['class' => ['flat-licenses-remove-submit']],
+                '#limit_validation_errors' => [],
+                '#name'       => 'flat_licenses_remove_button_' . $id,
+            ],
+        ];
+    }
+
+    $add_license = [
+
+        '#type'  => 'item',
+        '#title' => t('Add another license'),
+        'label'  => [
+            '#type'          => 'textfield',
+            '#size'          => 30,
+            '#default_value' => '',
+            '#prefix'        => '<div>',
+            '#suffix'        => '</div>',
+            '#attributes'    => ['placeholder' => 'Label'],
+        ],
+        'url'  => [
+            '#type'          => 'textfield',
+            '#size'          => 30,
+            '#default_value' => '',
+            '#prefix'        => '<div>',
+            '#suffix'        => '</div>',
+            '#attributes'    => ['placeholder' => 'URL'],
+        ],
+        'pid'  => [
+          '#type'          => 'textfield',
+          '#size'          => 30,
+          '#default_value' => '',
+          '#prefix'        => '<div>',
+          '#suffix'        => '</div>',
+          '#attributes'    => ['placeholder' => 'Fedora PID'],
+        ],
+        'button' => [
+            '#type'   => 'button',
+            '#value'  => t('Add'),
+            '#prefix' => '<div>',
+            '#suffix' => '</div>',
+            //'#limit_validation_errors' => [],
+            '#validate' => ['flat_license_admin_add_license_validate'],
+            //'#submit' => ['flat_license_admin_add_license_submit'],
+            '#name'   => 'add_label',
+            
+            '#ajax'   => [
+                'callback' => 'flat_license_admin_add_license_submit',
+                'wrapper'  => 'flat-licenses-admin-wrapper',
+                'event'    => 'click',
+                'effect'   => 'none',
+            ],
+            
+        ],
+    ];
+
+    if (isset($error) && !empty($error)) {
+        $add_license['#title']     .= '<br /><span class="flat-licenses-error">' . $error . '</span>';
+        $add_license['#attributes'] = ['class' => ['error']];
+    }
+
+    $form['general']['licenses']['table']['add_license'] = $add_license;
+    $form['general']['licenses']['table']['licenses']    = $licenses;
+
+    $form['actions'] = [
+
+        '#type' => 'actions',
+
+        'submit' => [
+
+            '#type'   => 'submit',
+            '#value'  => t('Save Configuration'),
+            '#weight' => 0,
+            '#submit' => ['flat_licenses_submit'],
+        ],
+    ];
+
+    return $form;
+}
+
+/**
+ * Which part of the form have to be returned
+ * when ajax is completed
+ *
+ * @param array $form
+ * @param array $form_state
+ *
+ * @return array
+ */
+function flat_license_admin_add_license_submit($form, &$form_state)
+{
+    return $form['general']['licenses']['table'];
+}
+
+/**
+ * Rebuild form when ajax is done
+ *
+ * @param array $form
+ * @param array $form_state
+ */
+/*
+function flat_licenses_admin_update_fields_submit($form, &$form_state)
+{
+    //$form_state['rebuild'] = true;
+}
+*/
+
+/**
+ * Preparing form_state data for insertion to database
+ *
+ * @param array $form_labels
+ *
+ * @return array
+ */
+function flat_licenses_admin_prepare_form_licenses($form_licenses)
+{
+
+    $licenses = [];
+
+    foreach ($form_licenses as $license) {
+        $licenses[][] = ['label' => $license['label'], 'url' => $license['url'], 'pid' => $license['pid']];
+    }
+
+    return $licenses;
+}
+
+/**
+ * Validate license url and pid values when adding new license to table
+ *
+ * @param array $form
+ * @param array $form_state
+ */
+function flat_license_admin_add_license_validate($form, &$form_state)
+{
+    $license = $form_state['values']['table']['add_license'];
+    $url = $license['url'];
+    $pid = $license['pid'];
+    if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+        form_set_error(
+            "table][add_license][url",
+            t('Invalid URL')
+        );
+    }
+    if (substr_count($pid, ':') !== 1) {
+        form_set_error(
+            "table][add_license][pid",
+            t('Invalid Fedora PID, should be in the form namespace:id')
+        );
+    }
+}
+
+/**
+ * Validate license url and pid values upon save to db
+ *
+ * @param array $form
+ * @param array $form_state
+ */
+function flat_licenses_validate($form, &$form_state)
+{
+    $licenses = array_key_exists('licenses', $form_state['input']['table']) ?
+        $form_state['input']['table']['licenses'] : [];
+    foreach ($licenses as $id => $license) {
+        $url = $license['url'];
+        $pid = $license['pid'];
+        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+            form_set_error(
+                "table][licenses][{$id}][url",
+                t('Invalid URL')
+            );
+        }
+        if (substr_count($pid, ':') !== 1) {
+            form_set_error(
+                "table][licenses][{$id}][pid",
+                t('Invalid Fedora PID, should be in the form namespace:id')
+            );
+        }
+    }
+}
+
+/**
+ * Saving licenses to db
+ *
+ * @param array $form
+ * @param array $form_state
+ */
+function flat_licenses_submit($form, &$form_state)
+{
+    $licenses = array_key_exists('licenses', $form_state['input']['table']) ?
+        flat_licenses_admin_prepare_form_licenses($form_state['input']['table']['licenses']) : [];
+    flat_licenses_db_commit_values($licenses);
+    drupal_set_message(t('Licenses were successfully saved'));
+}

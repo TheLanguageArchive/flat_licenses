@@ -1,0 +1,7 @@
+name = "FLAT Licenses"
+description = "A FLAT module for displaying applicable licenses for a given node"
+dependencies[] = islandora
+package = FLAT
+core = 7.x
+version = 7.x-0.1-dev
+configure = admin/config/flat_licenses
