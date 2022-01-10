@@ -201,6 +201,15 @@ class LicenseExtractor
 
         $no_license_message = "No License information available. Please contact the archive staff for advice.";
 
+        $current_path = current_path();
+
+        // hide license if not on object view page (path has additional segment)
+        $hide = preg_match('/.*islandora\/object\/.+\/.+/', $current_path);
+
+        if ($hide) {
+            return "";
+        }
+
         $ancestors = $this->ancestors($pid);
 
         if (!empty($ancestors)) {
