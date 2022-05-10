@@ -197,6 +197,8 @@ class LicenseExtractor
         $license_labels = [];
         $license_urls = [];
 
+        $type = "";
+
         $header = "<h2>License(s)/Agreement(s)</h2>";
 
         $no_license_message = "No License information available. Please contact the archive staff for advice.";
@@ -253,10 +255,10 @@ class LicenseExtractor
                     $key = array_search($ancestors[0], array_column($info, 'PID'));
                     $bundle_info = ($info[$key]);
                     if (array_key_exists('CMD_Components_MPI_Bundle_License_License_ms', $bundle_info)) {
-                        $license_labels = $bundle_info['CMD_Components_MPI_Bundle_License_License_ms'];
+                        $license_labels[] = $bundle_info['CMD_Components_MPI_Bundle_License_License_ms'];
                     }
                     if (array_key_exists('CMD_Components_MPI_Bundle_License_LicenseURL_ms', $bundle_info)) {
-                        $license_urls = $bundle_info['CMD_Components_MPI_Bundle_License_LicenseURL_ms'];
+                        $license_urls[] = $bundle_info['CMD_Components_MPI_Bundle_License_LicenseURL_ms'];
                     }
                 }
 
@@ -280,10 +282,10 @@ class LicenseExtractor
                         $parentkey = array_search($parent, array_column($info, 'PID'));
 
                         if (array_key_exists('CMD_Components_MPI_Bundle_License_License_ms', $parentinfo[0])) {
-                            $license_labels = $parentinfo[0]['CMD_Components_MPI_Bundle_License_License_ms'][0];
+                            $license_labels[] = $parentinfo[0]['CMD_Components_MPI_Bundle_License_License_ms'][0];
                         }
                         if (array_key_exists('CMD_Components_MPI_Bundle_License_LicenseURL_ms', $parentinfo[0])) {
-                            $license_urls = $parentinfo[0]['CMD_Components_MPI_Bundle_License_LicenseURL_ms'][0];
+                            $license_urls[] = $parentinfo[0]['CMD_Components_MPI_Bundle_License_LicenseURL_ms'][0];
                         }
                     }
                 }
