@@ -277,8 +277,6 @@ class LicenseExtractor
 
                         $parentinfo = $this->ancestorInfo($parent);
 
-                        var_dump($parentinfo[0]);
-
                         $parentkey = array_search($parent, array_column($info, 'PID'));
 
                         if (array_key_exists('CMD_Components_MPI_Bundle_License_License_ms', $parentinfo[0])) {
