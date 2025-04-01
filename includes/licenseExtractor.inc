@@ -255,10 +255,10 @@ class LicenseExtractor
                     $key = array_search($ancestors[0], array_column($info, 'PID'));
                     $bundle_info = ($info[$key]);
                     if (array_key_exists('CMD_Components_MPI_Bundle_License_License_ms', $bundle_info)) {
-                        $license_labels[] = $bundle_info['CMD_Components_MPI_Bundle_License_License_ms'];
+                        $license_labels[] = $bundle_info['CMD_Components_MPI_Bundle_License_License_ms'][0];
                     }
                     if (array_key_exists('CMD_Components_MPI_Bundle_License_LicenseURL_ms', $bundle_info)) {
-                        $license_urls[] = $bundle_info['CMD_Components_MPI_Bundle_License_LicenseURL_ms'];
+                        $license_urls[] = $bundle_info['CMD_Components_MPI_Bundle_License_LicenseURL_ms'][0];
                     }
                 }
 
@@ -360,7 +360,7 @@ class LicenseExtractor
                     $it->attachIterator(new ArrayIterator($license_urls));
 
                     $result = $header;
-    
+
                     foreach ($it as $license) {
                         $license_label = $license[0];
                         $license_url = $license[1];
